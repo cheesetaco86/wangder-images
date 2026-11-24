@@ -37,6 +37,9 @@ jobs:
           LOGF=publish/runs/$(date -u +%Y-%m).log
           echo "=== $(date -u +%FT%TZ) enabled=${PUBLISH_ENABLED:-0}" >> $LOGF
           set +e
+          # 佇列只由雲端寫入（避免 Mac 與雲端同時改 queue.json）：每次把所有內容排入，已存在的會略過
+          python3 scripts/publish.py queue output/daily/* >> $LOGF 2>&1
+          python3 scripts/publish.py queue-reels >> $LOGF 2>&1
           python3 scripts/publish.py run >> $LOGF 2>&1; rc=$?
           python3 scripts/publish.py cleanup >> $LOGF 2>&1
           python3 scripts/publish.py summary
