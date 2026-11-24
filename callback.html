@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>授權中</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font:18px -apple-system,sans-serif;padding:40px;text-align:center">
+<p>授權完成，正在交回你的 Mac…</p>
+<script>
+// Meta 授權完成後導回這裡，把一次性授權碼轉交給本機程式（127.0.0.1），不經過任何伺服器
+location.replace("http://127.0.0.1:8765/cb" + location.search);
+</script></body></html>
