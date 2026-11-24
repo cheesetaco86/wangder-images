@@ -45,7 +45,7 @@ jobs:
         if: always()
         working-directory: lab
         run: |
-          git add publish/queue.json publish/log.jsonl publish/runs CONTENT_HISTORY.json 2>/dev/null || true
+          git add -A publish CONTENT_HISTORY.json
           if ! git diff --cached --quiet; then
             git commit -q -m "publish: $(date -u +%FT%H:%MZ)"
             for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
