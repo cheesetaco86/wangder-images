@@ -1,0 +1,32 @@
+# 每週一 09:00（台灣）抓真實成效數據＋檢查 token，結果寫回 private repo。沒有授權就不產生任何數字。
+name: weekly-insights
+on:
+  schedule:
+    - cron: "0 1 * * 1"
+  workflow_dispatch: {}
+permissions: { contents: read }
+jobs:
+  insights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: cheesetaco86/wangder-lab, ssh-key: "${{ secrets.LAB_DEPLOY_KEY }}", path: lab }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -q pillow numpy scipy
+      - working-directory: lab
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: |
+          python3 scripts/insights.py > /dev/null 2>&1 || true
+          python3 scripts/token_check.py > /dev/null 2>&1 || true
+          echo "done"
+      - working-directory: lab
+        run: |
+          git config user.name "wangder-bot"; git config user.email "actions@users.noreply.github.com"
+          git add data/ CONTENT_HISTORY.json || true
+          git diff --cached --quiet || (git commit -q -m "insights: $(date -u +%F)" && git pull --rebase -q && git push -q)
