@@ -1,0 +1,21 @@
+# 手動執行：在雲端用加密 Secrets 做不公開測試（建立 container 但不發布）。只印通過/失敗。
+name: selftest
+on: { workflow_dispatch: { inputs: { only: { default: "threads" } } } }
+permissions: { contents: read }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: cheesetaco86/wangder-lab, ssh-key: "${{ secrets.LAB_DEPLOY_KEY }}", path: lab }
+      - uses: actions/checkout@v4
+        with: { path: lab/publish/public }
+      - working-directory: lab
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IMAGE_BASE_URL: ${{ secrets.IMAGE_BASE_URL }}
+        run: python3 scripts/live_test.py --only "${{ inputs.only }}" | sed -E 's/[0-9]{12,}/<id>/g'
