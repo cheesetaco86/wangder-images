@@ -4,7 +4,7 @@
 name: publish
 on:
   schedule:
-    - cron: "5,35 0-15 * * *"   # 台灣時間 08:05–23:35，每 30 分鐘
+    - cron: "10,30,50 0-15 * * *"   # 台灣時間 08:10–23:50；對準 12:10／12:30／20:30／21:30
   workflow_dispatch: {}
 concurrency: { group: publish, cancel-in-progress: false }
 permissions: { contents: write }
@@ -41,8 +41,7 @@ jobs:
           echo "=== $(date -u +%FT%TZ) enabled=${PUBLISH_ENABLED:-0}" >> $LOGF
           set +e
           # 佇列只由雲端寫入（避免 Mac 與雲端同時改 queue.json）：每次把所有內容排入，已存在的會略過
-          python3 scripts/publish.py queue output/daily/* >> $LOGF 2>&1
-          python3 scripts/publish.py queue-reels >> $LOGF 2>&1
+          python3 scripts/publish.py plan >> $LOGF 2>&1
           python3 scripts/publish.py run >> $LOGF 2>&1; rc=$?
           python3 scripts/publish.py cleanup >> $LOGF 2>&1
           python3 scripts/comments.py fetch >> $LOGF 2>&1

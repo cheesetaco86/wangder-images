@@ -1,0 +1,35 @@
+# 每天 08:00（台灣）檢查兩個平台權杖。失效或 Threads 剩不到 14 天 → 這個 workflow 失敗 → GitHub 自動寄 email 給帳號擁有者。
+name: health
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch: {}
+permissions: { contents: read }
+jobs:
+  tokens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: cheesetaco86/wangder-lab, ssh-key: "${{ secrets.LAB_DEPLOY_KEY }}", path: lab }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -q pillow numpy scipy
+      - name: 權杖檢查
+        working-directory: lab
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_TOKEN_AT: ${{ secrets.THREADS_TOKEN_AT }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_MODE: ${{ secrets.IG_MODE }}
+          IG_TOKEN_EXPIRES: ${{ secrets.IG_TOKEN_EXPIRES }}
+        run: python3 scripts/token_check.py --strict
+      - name: 狀態寫回 private repo
+        if: always()
+        working-directory: lab
+        run: |
+          git config user.name "wangder-bot"; git config user.email "actions@users.noreply.github.com"
+          git add data/token_status.json
+          git diff --cached --quiet || (git commit -q -m "health: $(date -u +%F)" && git pull --rebase -q && git push -q)
