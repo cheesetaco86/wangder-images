@@ -1,0 +1,47 @@
+# 接力觸發器：不依賴 GitHub cron 的準時度（cron 在尖峰常延遲數小時甚至跳過）。
+# 一個 run 最多活 5.5 小時：每 ≤10 分鐘讀一次 private 佇列（scripts/due.py），到點就 dispatch publish；
+# 時間到前自己 dispatch 下一棒（GITHUB_TOKEN 觸發 workflow_dispatch 會建立新 run）。
+# 每 2 小時的 cron 只當「斷棒重啟」用；同時有兩棒時，較新的那棒自動結束。公開 repo 的 Actions 免費。
+name: relay
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "7 */2 * * *"
+permissions: { contents: read, actions: write }
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env: { GH_TOKEN: "${{ github.token }}", R: "${{ github.repository }}" }
+    steps:
+      - name: 已有較早的接力在跑就結束
+        id: guard
+        run: |
+          older=$(gh run list -R $R -w relay -L 20 --json databaseId,status \
+            -q "[.[] | select((.status==\"in_progress\" or .status==\"queued\") and .databaseId < ${GITHUB_RUN_ID})] | length")
+          echo "older=$older"; [ "$older" = "0" ] && echo "go=1" >> $GITHUB_OUTPUT || echo "已有接力，結束"
+      - uses: actions/checkout@v4
+        if: steps.guard.outputs.go == '1'
+        with: { repository: cheesetaco86/wangder-lab, ssh-key: "${{ secrets.LAB_DEPLOY_KEY }}", path: lab, sparse-checkout: "scripts\npublish", sparse-checkout-cone-mode: true }
+      - name: 等到發文時間就觸發 publish
+        if: steps.guard.outputs.go == '1'
+        run: |
+          END=$(( $(date +%s) + 330*60 - 15*60 ))
+          while [ $(date +%s) -lt $END ]; do
+            git -C lab pull -q || true
+            out=$(python3 lab/scripts/due.py 2>/dev/null || echo '{"due":[],"next":null}')
+            due=$(echo "$out" | python3 -c 'import json,sys;print(" ".join(json.load(sys.stdin)["due"]))')
+            nxt=$(echo "$out" | python3 -c 'import json,sys;n=json.load(sys.stdin)["next"];print(n or 0)')
+            now=$(date +%s)
+            if [ -n "$due" ]; then
+              busy=$(gh run list -R $R -w publish -L 5 --json status -q '[.[]|select(.status=="in_progress" or .status=="queued")]|length')
+              if [ "$busy" = "0" ]; then echo "$(date -u +%T) 到期：$due → dispatch publish"; gh workflow run publish -R $R; fi
+              sleep 240; continue
+            fi
+            if [ "$nxt" -gt 0 ]; then s=$(( nxt - now + 20 )); else s=600; fi
+            [ $s -gt 600 ] && s=600; [ $s -lt 30 ] && s=30
+            sleep $s
+          done
+      - name: 交棒
+        if: always() && steps.guard.outputs.go == '1'
+        run: gh workflow run relay -R $R && echo "已交棒"

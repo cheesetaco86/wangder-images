@@ -6,7 +6,7 @@ on:
   schedule:
     - cron: "10,30,50 0-15 * * *"   # 台灣時間 08:10–23:50；對準 12:10／12:30／20:30／21:30
   workflow_dispatch: {}
-concurrency: { group: publish, cancel-in-progress: false }
+concurrency: { group: lab-writeback, cancel-in-progress: false }
 permissions: { contents: write }
 jobs:
   publish:
@@ -48,12 +48,7 @@ jobs:
           python3 scripts/comments.py send >> $LOGF 2>&1
           python3 scripts/publish.py summary
           exit $rc
-      - name: 紀錄寫回 private repo
+      - name: 紀錄寫回 private repo（衝突時以 log 重建，不遺失紀錄）
         if: always()
         working-directory: lab
-        run: |
-          git add -A publish data/comments CONTENT_HISTORY.json
-          if ! git diff --cached --quiet; then
-            git commit -q -m "publish: $(date -u +%FT%H:%MZ)"
-            for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
-          fi
+        run: bash scripts/writeback.sh "publish: $(date -u +%FT%H:%MZ)" publish/runs data/comments
