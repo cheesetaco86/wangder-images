@@ -51,4 +51,5 @@ jobs:
       - name: 紀錄寫回 private repo（衝突時以 log 重建，不遺失紀錄）
         if: always()
         working-directory: lab
-        run: bash scripts/writeback.sh "publish: $(date -u +%FT%H:%MZ)" publish/runs data/comments
+        run: |
+          bash scripts/writeback.sh "publish: $(date -u +%FT%H:%MZ)" publish/runs data/comments
