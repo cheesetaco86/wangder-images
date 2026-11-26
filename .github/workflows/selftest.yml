@@ -13,7 +13,7 @@ jobs:
         with: { path: lab/publish/public }
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - run: pip install -q pillow numpy scipy
+      - run: pip install -q pillow numpy scipy imageio-ffmpeg
       - working-directory: lab
         shell: bash
         env:
