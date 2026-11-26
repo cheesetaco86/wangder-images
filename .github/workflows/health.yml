@@ -1,4 +1,4 @@
-# 每天 08:00（台灣）檢查兩個平台權杖。失效或 Threads 剩不到 14 天 → 這個 workflow 失敗 → GitHub 自動寄 email 給帳號擁有者。
+# 每天 08:00（台灣）檢查兩個平台權杖＋抓當天真實成效（data/metrics、followers.jsonl）。失效或 Threads 剩不到 14 天 → 這個 workflow 失敗 → GitHub 自動寄 email 給帳號擁有者。
 name: health
 on:
   schedule:
@@ -26,12 +26,22 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           IG_MODE: ${{ secrets.IG_MODE }}
         run: python3 scripts/token_check.py --strict
+      - name: 每日真實成效（粉絲數、貼文數據；09:00 雲端創作前更新）
+        if: always()
+        working-directory: lab
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_MODE: ${{ secrets.IG_MODE }}
+        run: python3 scripts/insights.py || true
       - name: 狀態寫回 private repo
         if: always()
         working-directory: lab
         run: |
           git config user.name "wangder-bot"; git config user.email "actions@users.noreply.github.com"
-          git add data/token_status.json
+          git add data/token_status.json data/metrics CONTENT_HISTORY.json
           if ! git diff --cached --quiet; then
             git commit -q -m "health: $(date -u +%F)"
             for i in 1 2 3 4 5; do git pull --rebase -q && git push -q && break; sleep $((i * 7)); done
