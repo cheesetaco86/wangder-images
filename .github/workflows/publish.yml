@@ -21,7 +21,7 @@ jobs:
         with: { path: lab/publish/public }
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - run: pip install -q pillow numpy scipy
+      - run: pip install -q pillow numpy scipy imageio-ffmpeg
       - run: git config --global user.name "wangder-bot" && git config --global user.email "actions@users.noreply.github.com"
       - name: 發布（到時間且已核可）
         working-directory: lab

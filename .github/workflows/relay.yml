@@ -1,24 +1,27 @@
 # 接力觸發器：不依賴 GitHub cron 的準時度（cron 在尖峰常延遲數小時甚至跳過）。
 # 一個 run 最多活 5.5 小時：每 ≤10 分鐘讀一次 private 佇列（scripts/due.py），到點就 dispatch publish；
 # 時間到前自己 dispatch 下一棒（GITHUB_TOKEN 觸發 workflow_dispatch 會建立新 run）。
-# 每 2 小時的 cron 只當「斷棒重啟」用；同時有兩棒時，較新的那棒自動結束。公開 repo 的 Actions 免費。
+# cron 只當「斷棒重啟」用；同時有兩棒時，較新的那棒自動結束。公開 repo 的 Actions 免費。
+# 2026-11-26 修正：交棒時舊棒還沒結束，新棒的 guard 看到舊棒「進行中」就自己結束 → 斷棒（12:10 晚 58 分鐘由 Mac 補發）。
+# 現在交棒會帶 parent=舊棒 run id，guard 忽略 parent；重啟 cron 改每 30 分鐘。
 name: relay
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs: { parent: { description: "交棒的上一棒 run id（guard 會忽略它）", default: "0" } }
   schedule:
-    - cron: "7 */2 * * *"
+    - cron: "7,37 * * * *"
 permissions: { contents: read, actions: write }
 jobs:
   relay:
     runs-on: ubuntu-latest
     timeout-minutes: 340
-    env: { GH_TOKEN: "${{ github.token }}", R: "${{ github.repository }}" }
+    env: { GH_TOKEN: "${{ github.token }}", R: "${{ github.repository }}", PARENT: "${{ inputs.parent || '0' }}" }
     steps:
       - name: 已有較早的接力在跑就結束
         id: guard
         run: |
           older=$(gh run list -R $R -w relay -L 20 --json databaseId,status \
-            -q "[.[] | select((.status==\"in_progress\" or .status==\"queued\") and .databaseId < ${GITHUB_RUN_ID})] | length")
+            -q "[.[] | select((.status==\"in_progress\" or .status==\"queued\") and .databaseId < ${GITHUB_RUN_ID} and .databaseId != ${PARENT})] | length")
           echo "older=$older"; [ "$older" = "0" ] && echo "go=1" >> $GITHUB_OUTPUT || echo "已有接力，結束"
       - uses: actions/checkout@v4
         if: steps.guard.outputs.go == '1'
@@ -44,4 +47,4 @@ jobs:
           done
       - name: 交棒
         if: always() && steps.guard.outputs.go == '1'
-        run: gh workflow run relay -R $R && echo "已交棒"
+        run: gh workflow run relay -R $R -f parent=${GITHUB_RUN_ID} && echo "已交棒"
