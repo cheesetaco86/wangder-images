@@ -46,6 +46,19 @@ jobs:
           python3 scripts/publish.py cleanup >> $LOGF 2>&1
           python3 scripts/comments.py fetch >> $LOGF 2>&1
           python3 scripts/comments.py send >> $LOGF 2>&1
+          # Read-only discovery at most once per Taipei day; private output only.
+          PROBE_DAY=$(TZ=Asia/Taipei date +%F)
+          PROBE_FILE=data/comments/external-probe-${PROBE_DAY}.json
+          if [ "${PUBLISH_ENABLED:-0}" = 1 ] && [ ! -f publish/STOP ] && [ ! -f "$PROBE_FILE" ] && [ -f scripts/external_discovery_probe.py ]; then
+            mkdir -p data/comments
+            if python3 scripts/external_discovery_probe.py --self-test >> "$LOGF" 2>&1; then
+              if python3 scripts/external_discovery_probe.py > "$PROBE_FILE.tmp" 2>> "$LOGF"; then
+                mv "$PROBE_FILE.tmp" "$PROBE_FILE"
+              else
+                rm -f "$PROBE_FILE.tmp"
+              fi
+            fi
+          fi
           python3 scripts/publish.py summary
           exit $rc
       - name: 紀錄寫回 private repo（衝突時以 log 重建，不遺失紀錄）
